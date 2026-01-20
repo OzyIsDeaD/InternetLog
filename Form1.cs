@@ -1,135 +1,85 @@
-﻿using System;
-using System.Diagnostics;
+using System;
 using System.IO;
 using System.Net.NetworkInformation;
 using System.Windows.Forms;
+using System.Globalization;
+using Timer = System.Windows.Forms.Timer;
 
 namespace InternetLog
 {
     public partial class Form1 : Form
     {
-        // === AYARLAR ===
-        const int CHECK_INTERVAL_MS = 1000; // 1 saniye
-        const int RECOVERY_SECONDS = 15;
+        Timer pingTimer;
+        string logFilePath = "internet_log.txt";
 
-        string logFile = "internet_log.txt";
-
-        // === DURUM DEĞİŞKENLERİ ===
-        bool isOnline = true;
-        bool isRecovering = false;
-
-        DateTime? disconnectTime = null;
-        DateTime? recoveryStartTime = null;
-
-        System.Windows.Forms.Timer timer;
+        bool? lastInternetState = null;
 
         public Form1()
         {
             InitializeComponent();
-            Init();
         }
 
-        void Init()
+        private void Form1_Load(object sender, EventArgs e)
         {
-            timer = new System.Windows.Forms.Timer();
-            timer.Interval = CHECK_INTERVAL_MS;
-            timer.Tick += Timer_Tick;
-            timer.Start();
-
+            LoadOldLogs();
             Log("UYGULAMA BAŞLADI");
-            Log("--------------------------------");
+
+            CheckInternet(firstRun: true);
+            StartPingTimer();
         }
 
-        // === TIMER ===
-        void Timer_Tick(object sender, EventArgs e)
+        // =======================
+        // TIMER
+        // =======================
+        void StartPingTimer()
         {
-            DateTime now = DateTime.Now;
-            bool internetOk = IsInternetAvailable(out string reason);
-
-            // 🔴 ONLINE → OFFLINE
-            if (!internetOk && isOnline)
-            {
-                isOnline = false;
-                isRecovering = false;
-                disconnectTime = now;
-
-                Log($"İNTERNET GİTTİ → {reason}");
-            }
-
-            // 🔴 OFFLINE DEVAM
-            else if (!internetOk && !isOnline)
-            {
-                Log($"HALA YOK ({(now - disconnectTime.Value).TotalSeconds:F0} sn) → {reason}");
-            }
-
-            // 🟢 OFFLINE → ONLINE (RECOVERY BAŞLAR)
-            else if (internetOk && !isOnline && !isRecovering)
-            {
-                isRecovering = true;
-                recoveryStartTime = now;
-
-                Log("İNTERNET GELDİ → 15 SN STABİLİTE KONTROLÜ");
-            }
-
-            // 🟡 RECOVERY SÜRECİ
-            else if (internetOk && isRecovering)
-            {
-                double passed = (now - recoveryStartTime.Value).TotalSeconds;
-                Log($"STABİL KONTROL: {passed:F0}/{RECOVERY_SECONDS} sn");
-
-                if (passed >= RECOVERY_SECONDS)
-                {
-                    isRecovering = false;
-                    isOnline = true;
-
-                    Log("İNTERNET STABİL");
-                    Log("--------------------------------");
-                }
-            }
-
-            // 🟠 RECOVERY SIRASINDA TEKRAR GİDERSE
-            else if (!internetOk && isRecovering)
-            {
-                isRecovering = false;
-                isOnline = false;
-                disconnectTime = now;
-
-                Log("STABİL DEĞİL → TEKRAR GİTTİ");
-            }
+            pingTimer = new Timer();
+            pingTimer.Interval = 15000;
+            pingTimer.Tick += (s, e) => CheckInternet(false);
+            pingTimer.Start();
         }
 
-        // === INTERNET DURUMU ===
-        bool IsInternetAvailable(out string reason)
+        // =======================
+        // ANA KONTROL
+        // =======================
+        void CheckInternet(bool firstRun)
         {
-            bool modem = PingTest("192.168.50.1");
-            bool google = PingTest("8.8.8.8");
-            bool cloud = PingTest("1.1.1.1");
+            bool google = PingHost("8.8.8.8");
+            bool cloud = PingHost("1.1.1.1");
+            bool modem = PingHost("192.168.50.1");
 
-            if (!modem)
+            bool internetAvailable = google || cloud;
+
+            if (firstRun)
             {
-                reason = "MODEM YOK (LAN DOWN)";
-                return false;
+                lastInternetState = internetAvailable;
+                Log(internetAvailable ? "İNTERNET VAR" : "İNTERNET YOK");
+                UpdateFormTitle();
+                return;
             }
 
-            if (google || cloud)
-            {
-                reason = "İNTERNET VAR";
-                return true;
-            }
+            if (lastInternetState == internetAvailable)
+                return;
 
-            reason = "ISS / WAN DOWN";
-            return false;
+            if (!internetAvailable)
+                Log("İNTERNET GİTTİ");
+            else
+                Log("İNTERNET GELDİ");
+
+            lastInternetState = internetAvailable;
+            UpdateFormTitle();
         }
 
-        // === PING ===
-        bool PingTest(string host)
+        // =======================
+        // PING
+        // =======================
+        bool PingHost(string host)
         {
             try
             {
                 using (Ping ping = new Ping())
                 {
-                    PingReply reply = ping.Send(host, 1000);
-                    return reply.Status == IPStatus.Success;
+                    return ping.Send(host, 3000).Status == IPStatus.Success;
                 }
             }
             catch
@@ -138,29 +88,92 @@ namespace InternetLog
             }
         }
 
-        // === LOG ===
+        // =======================
+        // LOG
+        // =======================
         void Log(string message)
         {
-            string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
-
-            // TXT log
-            File.AppendAllText(logFile, line + Environment.NewLine);
-
-            // RichTextBox log
-            if (richTextBox1.InvokeRequired)
-            {
-                richTextBox1.Invoke(new Action(() =>
-                {
-                    richTextBox1.AppendText(line + Environment.NewLine);
-                    richTextBox1.ScrollToCaret();
-                }));
-            }
-            else
-            {
-                richTextBox1.AppendText(line + Environment.NewLine);
-                richTextBox1.ScrollToCaret();
-            }
+            string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | {message}";
+            File.AppendAllText(logFilePath, line + Environment.NewLine);
+            richTextBox1.AppendText(line + Environment.NewLine);
+            richTextBox1.ScrollToCaret();
+            UpdateFormTitle();
         }
 
+
+        void LoadOldLogs()
+        {
+            if (File.Exists(logFilePath))
+                richTextBox1.Text = File.ReadAllText(logFilePath);
+
+            UpdateFormTitle();
+        }
+
+
+        // =======================
+        // SON 24 SAAT KOPMA
+        // =======================
+        int GetLast24HoursDropCount()
+        {
+            if (!File.Exists(logFilePath))
+                return 0;
+
+            DateTime limit = DateTime.Now.AddHours(-24);
+            int count = 0;
+
+            foreach (var line in File.ReadLines(logFilePath))
+            {
+                if (!line.Contains("İNTERNET GİTTİ"))
+                    continue;
+
+                DateTime logTime;
+
+                // 🟢 ESKİ FORMAT: [yyyy-MM-dd HH:mm:ss]
+                if (line.StartsWith("["))
+                {
+                    int end = line.IndexOf(']');
+                    if (end <= 1)
+                        continue;
+
+                    string datePart = line.Substring(1, end - 1);
+
+                    if (!DateTime.TryParseExact(
+                        datePart,
+                        "yyyy-MM-dd HH:mm:ss",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out logTime))
+                        continue;
+                }
+                // 🟢 YENİ FORMAT: yyyy-MM-dd HH:mm:ss |
+                else
+                {
+                    string datePart = line.Substring(0, 19);
+
+                    if (!DateTime.TryParseExact(
+                        datePart,
+                        "yyyy-MM-dd HH:mm:ss",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out logTime))
+                        continue;
+                }
+
+                if (logTime >= limit)
+                    count++;
+            }
+
+            return count;
+        }
+
+
+        // =======================
+        // FORM BAŞLIĞI
+        // =======================
+        void UpdateFormTitle()
+        {
+            int drops = GetLast24HoursDropCount();
+            Text = $"InternetLog – Son 24 Saat: {drops} Kopma";
+        }
     }
 }
