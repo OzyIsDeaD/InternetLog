@@ -1,4 +1,4 @@
-﻿namespace InternetLog
+namespace InternetLog
 {
     partial class Form1
     {
@@ -33,7 +33,9 @@
             // 
             // richTextBox1
             // 
+            richTextBox1.BackColor = Color.Black;
             richTextBox1.Dock = DockStyle.Fill;
+            richTextBox1.ForeColor = Color.Lime;
             richTextBox1.Location = new Point(0, 0);
             richTextBox1.Name = "richTextBox1";
             richTextBox1.Size = new Size(509, 254);
@@ -48,6 +50,7 @@
             Controls.Add(richTextBox1);
             Name = "Form1";
             Text = "InternetLog";
+            Load += Form1_Load;
             ResumeLayout(false);
         }
 
