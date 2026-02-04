@@ -153,7 +153,7 @@ namespace InternetLog
 
                 DateTime logTime;
 
-                // 🟢 ESKİ FORMAT: [yyyy-MM-dd HH:mm:ss]
+                // ESKİ FORMAT: [yyyy-MM-dd HH:mm:ss]
                 if (line.StartsWith("["))
                 {
                     int end = line.IndexOf(']');
@@ -170,7 +170,7 @@ namespace InternetLog
                         out logTime))
                         continue;
                 }
-                // 🟢 YENİ FORMAT: yyyy-MM-dd HH:mm:ss |
+                // YENİ FORMAT: yyyy-MM-dd HH:mm:ss |
                 else
                 {
                     string datePart = line.Substring(0, 19);
@@ -202,3 +202,4 @@ namespace InternetLog
         }
     }
 }
+
