@@ -13,7 +13,9 @@ namespace InternetLog
         string logFilePath = "internet_log.txt";
 
         bool? lastInternetState = null;
-
+        bool lastGoogleState;
+        bool lastCloudState;
+        bool lastModemState;
         public Form1()
         {
             InitializeComponent();
@@ -42,6 +44,8 @@ namespace InternetLog
         // =======================
         // ANA KONTROL
         // =======================
+               
+
         void CheckInternet(bool firstRun)
         {
             bool google = PingHost("8.8.8.8");
@@ -52,23 +56,44 @@ namespace InternetLog
 
             if (firstRun)
             {
+                lastGoogleState = google;
+                lastCloudState = cloud;
+                lastModemState = modem;
                 lastInternetState = internetAvailable;
+
                 Log(internetAvailable ? "İNTERNET VAR" : "İNTERNET YOK");
                 UpdateFormTitle();
                 return;
             }
 
-            if (lastInternetState == internetAvailable)
-                return;
-
-            if (!internetAvailable)
-                Log("İNTERNET GİTTİ");
+            // GENEL İNTERNET DURUMU (öncelikli)
+            if (lastInternetState != internetAvailable)
+            {
+                Log(internetAvailable ? "İNTERNET GELDİ" : "İNTERNET GİTTİ");
+                lastInternetState = internetAvailable;
+            }
             else
-                Log("İNTERNET GELDİ");
+            {
+                // TEK TEK KONTROLLER (sadece genel durum değişmediyse)
 
-            lastInternetState = internetAvailable;
+                if (lastGoogleState != google)
+                    Log(google ? "Google bağlantısı GELDİ" : "Google bağlantısı GİTTİ");
+
+                if (lastCloudState != cloud)
+                    Log(cloud ? "Cloud bağlantısı GELDİ" : "Cloud bağlantısı GİTTİ");
+            }
+
+            // MODEM HER ZAMAN BAĞIMSIZ
+            if (lastModemState != modem)
+                Log(modem ? "Modem bağlantısı GELDİ" : "Modem bağlantısı GİTTİ");
+
+            lastGoogleState = google;
+            lastCloudState = cloud;
+            lastModemState = modem;
+
             UpdateFormTitle();
         }
+
 
         // =======================
         // PING
