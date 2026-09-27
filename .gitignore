@@ -1,0 +1,16 @@
+# Build çıktıları
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# Uygulama logu
+internet_log.txt
